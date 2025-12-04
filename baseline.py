@@ -165,7 +165,7 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
               f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.2f}% , "
               f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.2f}%")
 
-def main(args):
+def main():
     train_dataset = JesterDataset(csv_file=train_csv, 
                                   root_dir=data_root, 
                                   label_map=label_to_idx, 
