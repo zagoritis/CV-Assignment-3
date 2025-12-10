@@ -19,7 +19,7 @@ train_csv = "jester-v1-small-train.csv" if use_small_train else "jester-v1-train
 val_csv = "jester-v1-validation.csv"
 labels_csv = "jester-v1-labels.csv"
 
-num_epochs = 10
+num_epochs = 20
 batch_size = 32          # you can lower this if you get OOM
 learning_rate = 0.001
 input_size = 112
