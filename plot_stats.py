@@ -44,8 +44,8 @@ def plot_accuracy(baseline_stats, improved_stats):
     plt.savefig("final_accuracy.png", dpi=300)
 
 def main():
-    baseline_stats = torch.load("baseline_history.pt")
-    improved_stats = torch.load("improved_history.pt")
+    baseline_stats = torch.load("baseline_stats.pt")
+    improved_stats = torch.load("improved_stats.pt")
 
     plot_learning(baseline_stats, improved_stats)
     plot_accuracy(baseline_stats, improved_stats)

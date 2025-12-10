@@ -5,18 +5,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from baseline import (
-    JesterDataset,
+    JesterDataset2D,
     BaselineCNN,
-    gesture_labels,
-    label_to_idx,
-    num_classes,
+    val_transform,
     data_root,
     val_csv,
+    batch_size,
+    num_workers,
+    num_classes,
+    label_to_idx,
+    gesture_labels,
+    num_workers,
     input_size,
     video_mean,
     video_std,
-    batch_size,
-    num_workers,
 )
 
 def get_predictions_and_labels(model, data_loader, device):
@@ -26,11 +28,12 @@ def get_predictions_and_labels(model, data_loader, device):
 
     with torch.no_grad():
         for inputs, labels in data_loader:
-            inputs = inputs.permute(0, 2, 1, 3, 4).to(device, non_blocking=True)
+            # inputs: (B, C, H, W) – already correct for BaselineCNN / ResNet18
+            inputs = inputs.to(device, non_blocking=True)
             labels = labels.to(device, non_blocking=True)
 
             logits = model(inputs)
-            _, predictions = torch.max(logits, 1)
+            predictions = torch.argmax(logits, dim=1)
 
             all_predictions.append(predictions.cpu().numpy())
             all_labels.append(labels.cpu().numpy())
@@ -38,6 +41,7 @@ def get_predictions_and_labels(model, data_loader, device):
     all_predictions = np.concatenate(all_predictions)
     all_labels = np.concatenate(all_labels)
     return all_predictions, all_labels
+
 
 def plot_confusion_matrix(conf_matrix, class_names, filename):
     plt.figure(figsize=(8, 8))
@@ -64,7 +68,7 @@ def main():
         transforms.Normalize(mean=video_mean, std=video_std),
     ])
 
-    val_dataset = JesterDataset(
+    val_dataset = JesterDataset2D(
         csv_file=val_csv,
         root_dir=data_root,
         label_map=label_to_idx,
@@ -82,12 +86,13 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = BaselineCNN(num_classes=num_classes).to(device)
-    checkpoint = torch.load("jester_baseline_model.ckpt", map_location=device)
+    checkpoint = torch.load("jester_baseline_model.ckpt", map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state_dict"])
 
     predictions, labels = get_predictions_and_labels(model, val_loader, device)
-    confusion_matrix = confusion_matrix(labels, predictions, labels=list(range(num_classes)))
-    plot_confusion_matrix(confusion_matrix, gesture_labels, filename="confusion_matrix_baseline.png")
+    conf_matrix = confusion_matrix(labels, predictions, labels=list(range(num_classes)))
+
+    plot_confusion_matrix(conf_matrix, gesture_labels, filename="confusion_matrix_baseline.png")
 
 if __name__ == "__main__":
     main()

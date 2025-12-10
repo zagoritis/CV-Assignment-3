@@ -209,7 +209,7 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
 
         if best_accuracy < val_acc:
             best_accuracy = val_acc
-            torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict':optimizer.state_dict()}, 'jester_improved_model.ckpt')
+            torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict':optimizer.state_dict()}, 'jester_baseline_model.ckpt')
 
         if scheduler:
             scheduler.step()
