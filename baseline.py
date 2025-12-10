@@ -128,7 +128,7 @@ val_transform = transforms.Compose([
 # Baseline 2D model
 # -----------------------------
 
-class Baseline2D(nn.Module):
+class BaselineCNN(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
         # No pretrained weights: starts from random init
@@ -169,15 +169,18 @@ def evaluate(model, data_loader, criterion, device):
 # -----------------------------
 # Training loop
 # -----------------------------
-def train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler=None):
+def train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler):
     model = model.to(device)
     best_accuracy = 0.0
     scaler = GradScaler()
+    
+    stats = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
 
     for epoch in range(num_epochs):
         model.train()
-        with tqdm(total=len(train_loader), desc=f'Epoch {epoch + 1}/{num_epochs}', position=0, leave=True) as pbar:
+        with tqdm(total=len(train_loader), desc=f'Epoch {epoch +1}/{num_epochs}', position=0, leave=True) as pbar:
             for inputs, labels in train_loader:
+                # inputs: (B, C, H, W) – already correct for ResNet18
                 inputs = inputs.to(device, non_blocking=True)
                 labels = labels.to(device, non_blocking=True)
 
@@ -189,28 +192,29 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-
+                
                 pbar.update(1)
                 pbar.set_postfix(loss=loss.item())
 
         train_loss, train_acc = evaluate(model, train_loader, criterion, device)
-        print(f"\nTraining set: Average loss = {train_loss:.4f}, Accuracy = {train_acc:.4f}")
+        print('\n'+f'Training set: Average loss = {train_loss:.4f}, Accuracy = {train_acc:.4f}')
 
-        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
-        print(f"Validation set: Average loss = {val_loss:.4f}, Accuracy = {val_acc:.4f}")
+        val_loss, val_acc  = evaluate(model, val_loader, criterion, device)
+        print(f'Validation set: Average loss = {val_loss:.4f}, Accuracy = {val_acc:.4f}')
 
-        if val_acc > best_accuracy:
+        stats["train_loss"].append(train_loss)
+        stats["train_acc"].append(train_acc)
+        stats["val_loss"].append(val_loss)
+        stats["val_acc"].append(val_acc)
+
+        if best_accuracy < val_acc:
             best_accuracy = val_acc
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                },
-                "jester_baseline2d_model.ckpt",
-            )
+            torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict':optimizer.state_dict()}, 'jester_improved_model.ckpt')
 
-        if scheduler is not None:
+        if scheduler:
             scheduler.step()
+
+    return stats
 
 # -----------------------------
 # Main
@@ -249,12 +253,13 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    model = Baseline2D(num_classes=num_classes)
+    model = BaselineCNN(num_classes=num_classes)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.0005)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
-    train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler)
+    stats = train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler=scheduler)
+    torch.save(stats, "baseline_stats.pt")
 
 if __name__ == "__main__":
     main()
