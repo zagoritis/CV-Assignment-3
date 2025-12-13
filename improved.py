@@ -18,11 +18,11 @@ val_csv = "jester-v1-validation.csv"
 labels_csv = "jester-v1-labels.csv"
 
 num_epochs = 10
-batch_size = 2
+batch_size = 8
 learning_rate = 0.001
 input_size = 112
 num_workers = 8
-frames_per_clip = 32
+frames_per_clip = 16
 dataset_repeat = 2
 
 with open(labels_csv, 'r') as f:
@@ -95,11 +95,20 @@ class JesterDataset(Dataset):
 video_mean = [0.43216, 0.394666, 0.37645]
 video_std = [0.22803, 0.22145, 0.216989]
 
-transform = transforms.Compose([
+train_transform = transforms.Compose([
+    transforms.Resize((128, 171)),
+    transforms.RandomResizedCrop(input_size, scale=(0.6, 1.0)),
+    transforms.RandomRotation(degrees=10),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=video_mean, std=video_std),
+])
+
+val_transform = transforms.Compose([
     transforms.Resize((128, 171)),
     transforms.CenterCrop((input_size, input_size)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=video_mean, std=video_std)
+    transforms.Normalize(mean=video_mean, std=video_std),
 ])
 
 class ImprovedCNN(nn.Module):
@@ -107,7 +116,10 @@ class ImprovedCNN(nn.Module):
         super(ImprovedCNN, self).__init__()
         weights = R3D_18_Weights.DEFAULT
         self.model = r3d_18(weights=weights)
-        self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
+        self.model.fc = nn.Sequential(
+            nn.Dropout(p=0.5),
+            nn.Linear(self.model.fc.in_features, num_classes)
+        )
 
     def forward(self, x):
         return self.model(x)
@@ -140,6 +152,8 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
     best_accuracy = 0.0
     scaler = GradScaler()
     
+    stats = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
+
     for epoch in range(num_epochs):
         model.train()
         with tqdm(total=len(train_loader), desc=f'Epoch {epoch +1}/{num_epochs}', position=0, leave=True) as pbar:
@@ -155,33 +169,40 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
                 scaler.update()
-                
+
+                if scheduler:
+                    scheduler.step()
+
                 pbar.update(1)
                 pbar.set_postfix(loss=loss.item())
 
         train_loss, train_acc = evaluate(model, train_loader, criterion, device)
         print('\n'+f'Training set: Average loss = {train_loss:.4f}, Accuracy = {train_acc:.4f}')
 
-        avg_loss, accuracy  = evaluate(model, val_loader, criterion, device)
-        print(f'Validation set: Average loss = {avg_loss:.4f}, Accuracy = {accuracy:.4f}')
+        val_loss, val_acc  = evaluate(model, val_loader, criterion, device)
+        print(f'Validation set: Average loss = {val_loss:.4f}, Accuracy = {val_acc:.4f}')
 
-        if best_accuracy < accuracy:
-            best_accuracy = accuracy
+        stats["train_loss"].append(train_loss)
+        stats["train_acc"].append(train_acc)
+        stats["val_loss"].append(val_loss)
+        stats["val_acc"].append(val_acc)
+
+        if best_accuracy < val_acc:
+            best_accuracy = val_acc
             torch.save({'model_state_dict': model.state_dict(), 'optimizer_state_dict':optimizer.state_dict()}, 'jester_improved_model.ckpt')
 
-        if scheduler:
-            scheduler.step()
+    return stats
 
 def main():
     train_dataset = JesterDataset(csv_file=train_csv, 
                                   root_dir=data_root, 
                                   label_map=label_to_idx, 
-                                  transform=transform, 
+                                  transform=train_transform, 
                                   train=True)
     val_dataset = JesterDataset(csv_file=val_csv, 
                                 root_dir=data_root, 
                                 label_map=label_to_idx, 
-                                transform=transform, 
+                                transform=val_transform, 
                                 train=False)
 
     train_loader = DataLoader(train_dataset, 
@@ -195,15 +216,18 @@ def main():
                             num_workers=num_workers, 
                             pin_memory=True)
 
+    steps_per_epoch = len(train_loader)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.backends.cudnn.benchmark = True
 
     model = ImprovedCNN(num_classes=num_classes)
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.0005)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
+    scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, epochs=num_epochs, steps_per_epoch=steps_per_epoch, pct_start=0.1, div_factor=10, final_div_factor=100)
 
-    train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler=scheduler)
+    stats = train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler=scheduler)
+    torch.save(stats, "improved_stats.pt")
 
 if __name__ == "__main__":
     main()
