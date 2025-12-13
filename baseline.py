@@ -6,13 +6,10 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
-from torchvision.models import resnet18, ResNet18_Weights
+from torchvision.models import resnet18
 from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 
-# -----------------------------
-# Config
-# -----------------------------
 use_small_train = True
 data_root = "small-20bn-jester-v1"
 train_csv = "jester-v1-small-train.csv" if use_small_train else "jester-v1-train.csv"
@@ -20,31 +17,18 @@ val_csv = "jester-v1-validation.csv"
 labels_csv = "jester-v1-labels.csv"
 
 num_epochs = 20
-batch_size = 32          # you can lower this if you get OOM
+batch_size = 32
 learning_rate = 0.001
 input_size = 112
 num_workers = 8
-dataset_repeat = 2       # repeat to have more iterations per epoch
+dataset_repeat = 2
 
-# -----------------------------
-# Labels
-# -----------------------------
 with open(labels_csv, 'r') as f:
     gesture_labels = [line.strip() for line in f.readlines()]
 label_to_idx = {label: idx for idx, label in enumerate(gesture_labels)}
 num_classes = len(gesture_labels)
 
-# -----------------------------
-# Dataset (2D single-frame)
-# -----------------------------
 class JesterDataset2D(Dataset):
-    """
-    Baseline dataset:
-    - Reads all frames from a video folder.
-    - For training: picks a random frame.
-    - For validation: picks the middle frame.
-    - Returns a single image tensor (C, H, W) and label.
-    """
     def __init__(self, csv_file, root_dir, label_map, transform=None, train=True):
         self.root_dir = root_dir
         self.label_map = label_map
@@ -63,7 +47,6 @@ class JesterDataset2D(Dataset):
                     continue
                 class_idx = self.label_map[label_name]
                 self.samples.append((video_id, class_idx))
-        # cache frame file lists for speed
         self.frame_cache = {}
 
     def __len__(self):
@@ -85,10 +68,8 @@ class JesterDataset2D(Dataset):
             raise RuntimeError(f"No frames found in video folder {video_folder}")
         
         if self.train:
-            # random frame during training
             frame_index = random.randint(0, len(frames_list) - 1)
         else:
-            # middle frame for validation
             frame_index = len(frames_list) // 2
 
         frame_file = frames_list[frame_index]
@@ -100,15 +81,11 @@ class JesterDataset2D(Dataset):
         label = class_idx
         return image, label
 
-# -----------------------------
-# Transforms (same mean/std as 3D model)
-# -----------------------------
 video_mean = [0.43216, 0.394666, 0.37645]
 video_std = [0.22803, 0.22145, 0.216989]
 
 train_transform = transforms.Compose([
     transforms.Resize((128, 171)),
-    # Make position / scale less trivial
     transforms.RandomResizedCrop(input_size, scale=(0.6, 1.0)),
     transforms.RandomRotation(degrees=10),
     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
@@ -123,26 +100,15 @@ val_transform = transforms.Compose([
     transforms.Normalize(mean=video_mean, std=video_std),
 ])
 
-
-# -----------------------------
-# Baseline 2D model
-# -----------------------------
-
 class BaselineCNN(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        # No pretrained weights: starts from random init
-        self.model = resnet18(weights=None)   # or resnet18() in older torchvision
+        self.model = resnet18(weights=None)
         self.model.fc = nn.Linear(self.model.fc.in_features, num_classes)
 
-
     def forward(self, x):
-        # x shape: (B, C, H, W) single frame
         return self.model(x)
 
-# -----------------------------
-# Evaluation
-# -----------------------------
 def evaluate(model, data_loader, criterion, device):
     model.eval()
     total_loss = 0.0
@@ -166,9 +132,6 @@ def evaluate(model, data_loader, criterion, device):
     accuracy = total_correct / total_samples if total_samples > 0 else 0.0
     return avg_loss, accuracy
 
-# -----------------------------
-# Training loop
-# -----------------------------
 def train(model, train_loader, val_loader, optimizer, criterion, device, num_epochs, scheduler):
     model = model.to(device)
     best_accuracy = 0.0
@@ -180,7 +143,6 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
         model.train()
         with tqdm(total=len(train_loader), desc=f'Epoch {epoch +1}/{num_epochs}', position=0, leave=True) as pbar:
             for inputs, labels in train_loader:
-                # inputs: (B, C, H, W) – already correct for ResNet18
                 inputs = inputs.to(device, non_blocking=True)
                 labels = labels.to(device, non_blocking=True)
 
@@ -216,9 +178,6 @@ def train(model, train_loader, val_loader, optimizer, criterion, device, num_epo
 
     return stats
 
-# -----------------------------
-# Main
-# -----------------------------
 def main():
     train_dataset = JesterDataset2D(
         csv_file=train_csv,

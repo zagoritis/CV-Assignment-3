@@ -1,6 +1,5 @@
 import os
 import random
-import argparse
 from PIL import Image
 import torch
 import torch.nn as nn

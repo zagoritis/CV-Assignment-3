@@ -13,7 +13,7 @@ def plot_learning(baseline_stats, improved_stats):
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.title("Train/Val Accuracy for each Epoch")
+    plt.title("Train and Validation Accuracy for each Epoch")
     plt.tight_layout()
     plt.savefig("accuracy_curves.png", dpi=300)
 
@@ -25,7 +25,7 @@ def plot_learning(baseline_stats, improved_stats):
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.legend()
-    plt.title("Train/Val Loss for each Epoch")
+    plt.title("Train and Validation Loss for each Epoch")
     plt.tight_layout()
     plt.savefig("loss_curves.png", dpi=300)
 

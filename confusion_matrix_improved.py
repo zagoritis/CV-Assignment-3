@@ -3,6 +3,7 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 from sklearn.metrics import confusion_matrix
 from improved import (
     JesterDataset,
@@ -40,17 +41,25 @@ def get_predictions_and_labels(model, data_loader, device):
     return all_predictions, all_labels
 
 def plot_confusion_matrix(conf_matrix, class_names, filename):
-    plt.figure(figsize=(8, 8))
-    im = plt.imshow(conf_matrix, interpolation="nearest")
-    plt.title("Confusion Matrix for Improved 3D Model")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
+    cm = conf_matrix.astype(float)
+    row_sums = cm.sum(axis=1, keepdims=True)
+    cm_norm = np.divide(cm, row_sums, out=np.zeros_like(cm), where=row_sums!=0)
 
-    plt.xticks(range(len(class_names)), class_names, rotation=90)
-    plt.yticks(range(len(class_names)), class_names)
+    fig, ax = plt.subplots(figsize=(8, 8))
+    im = ax.imshow(cm_norm, interpolation="nearest", vmin=0, vmax=1)
 
-    cbar = plt.colorbar(im, fraction=0.035, pad=0.04)
-    cbar.ax.set_yticks([])
+    ax.set_title("Confusion Matrix for Improved 3D Model")
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+
+    ax.set_xticks(range(len(class_names)))
+    ax.set_xticklabels(class_names, rotation=90)
+    ax.set_yticks(range(len(class_names)))
+    ax.set_yticklabels(class_names)
+
+    cbar = fig.colorbar(im, ax=ax, orientation="vertical", pad=0.04, fraction=0.046)
+    cbar.ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
+    cbar.set_ticks([0, 0.5, 1.0])
 
     plt.tight_layout()
     plt.savefig(filename, dpi=300)
