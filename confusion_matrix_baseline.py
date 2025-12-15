@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from sklearn.metrics import confusion_matrix
+import csv
 from baseline import (
     JesterDataset2D,
     BaselineCNN,
@@ -26,6 +27,7 @@ def get_predictions_and_labels(model, data_loader, device):
     model.eval()
     all_predictions = []
     all_labels = []
+    all_video_ids = []
 
     with torch.no_grad():
         for inputs, labels in data_loader:
@@ -98,8 +100,21 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
 
     predictions, labels = get_predictions_and_labels(model, val_loader, device)
-    conf_matrix = confusion_matrix(labels, predictions, labels=list(range(num_classes)))
 
+    items, samples, video_ids = len(val_dataset), len(val_dataset.samples), []
+    for idx in range(items):
+        sample_idx = idx % samples
+        video_id, _ = val_dataset.samples[sample_idx]
+        video_ids.append(video_id)
+    wrong = np.where(predictions != labels)[0]
+
+    with open("baseline_misclassified.csv", "w", newline="", encoding="utf-8") as f:
+        baseline_misclassified = csv.writer(f)
+        baseline_misclassified.writerow(["video_id", "true_label", "pred_label"])
+        for i in wrong:
+            baseline_misclassified.writerow([video_ids[i], gesture_labels[int(labels[i])], gesture_labels[int(predictions[i])]])
+
+    conf_matrix = confusion_matrix(labels, predictions, labels=list(range(num_classes)))
     plot_confusion_matrix(conf_matrix, gesture_labels, filename="confusion_matrix_baseline.png")
 
 if __name__ == "__main__":

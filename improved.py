@@ -36,7 +36,7 @@ class JesterDataset(Dataset):
         self.transform = transform
         self.train = train
         self.num_frames = frames_per_clip
-        self.repeat_factor = dataset_repeat
+        self.repeat_factor = dataset_repeat if train else 1
         self.samples = []
         
         with open(csv_file, 'r') as f:

@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 from sklearn.metrics import confusion_matrix
+import csv
 from improved import (
     JesterDataset,
     ImprovedCNN,
@@ -95,6 +96,20 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
 
     predictions, labels = get_predictions_and_labels(model, val_loader, device)
+
+    items, samples, video_ids = len(val_dataset), len(val_dataset.samples), []
+    for idx in range(items):
+        sample_idx = idx % samples
+        video_id, _ = val_dataset.samples[sample_idx]
+        video_ids.append(video_id)
+    wrong = np.where(predictions != labels)[0]
+
+    with open("improved_misclassified.csv", "w", newline="", encoding="utf-8") as f:
+        improved_misclassified = csv.writer(f)
+        improved_misclassified.writerow(["video_id", "true_label", "pred_label"])
+        for i in wrong:
+            improved_misclassified.writerow([video_ids[i], gesture_labels[int(labels[i])], gesture_labels[int(predictions[i])]])
+
     conf_matrix = confusion_matrix(labels, predictions, labels=list(range(num_classes)))
     plot_confusion_matrix(conf_matrix, gesture_labels, filename="confusion_matrix_improved.png")
 
