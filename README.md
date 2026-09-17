@@ -26,7 +26,7 @@ The single-frame model struggles with gestures that look alike but move differen
 | `confusion_matrix_*.py` | Confusion matrix + list of misclassified videos |
 | `plot_stats.py` | Accuracy/loss plots |
 | `jester-v1-*.csv` | Labels and train/validation splits |
-| `*_stats.pt`, `*.png`, `*_misclassified.csv` | Saved results |
+| `results\` | Saved results |
 
 ## Usage
 
