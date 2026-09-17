@@ -1,4 +1,4 @@
-# Jester Gesture Recognition: 2D vs 3D CNN
+# Video Gesture Recognition: 2D vs 3D CNN
 
 Classifying hand-gesture videos from the [Jester dataset](https://www.qualcomm.com/developer/software/jester-dataset/downloads) (27 classes) with two models:
 
