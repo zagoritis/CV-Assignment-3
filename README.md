@@ -14,7 +14,7 @@ Both are trained on a 20% subset of the training data (limited hardware) and eva
 | Baseline 2D | 1 frame | **50.7%** |
 | Improved 3D | 16 frames | **85.8%** |
 
-<p> <img src="accuracy_curves.png" alt="Accuracy curves" width="500"> </p>
+<p> <img src="results/accuracy_curves.png" alt="Accuracy curves" width="500"> </p>
 
 The single-frame model struggles with gestures that look alike but move differently (e.g. swiping left vs right). The 3D model mostly fixes this; its remaining errors are mainly opposite-direction pairs such as turning clockwise vs counterclockwise. See `confusion_matrix_baseline.png` and `confusion_matrix_improved.png`.
 
